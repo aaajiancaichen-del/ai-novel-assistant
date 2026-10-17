@@ -17,6 +17,7 @@ def get_api_key():
     try:
         return st.secrets.get("GEMINI_API_KEY", "") or os.getenv("GEMINI_API_KEY", "")
     except Exception:
+                    print(f"Gemini API ERROR: code={getattr(exc, 'code', '?')} detail={str(exc)[:500]}", flush=True)
         return os.getenv("GEMINI_API_KEY", "")
 
 
