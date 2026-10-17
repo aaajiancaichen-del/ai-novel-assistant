@@ -17,7 +17,6 @@ def get_api_key():
     try:
         return st.secrets.get("GEMINI_API_KEY", "") or os.getenv("GEMINI_API_KEY", "")
     except Exception:
-                    print(f"Gemini API ERROR: code={getattr(exc, 'code', '?')} detail={str(exc)[:500]}", flush=True)
         return os.getenv("GEMINI_API_KEY", "")
 
 
@@ -126,7 +125,8 @@ if st.button("✨ 开始生成", type="primary", use_container_width=True):
             if not st.session_state.generated_text:
                 st.warning("模型未返回可显示的文字，请调整要求后重试。")
         except Exception as exc:
-            # 避免直接输出服务端异常详情，其中可能包含不该公开的信息。
+            print(f"Gemini API ERROR: code={getattr(exc, 'code', '?')} detail={str(exc)[:500]}", flush=True)
+            # 避免直接输出服务端异常详情
             code = getattr(exc, "code", None)
             if code == 429 or "RESOURCE_EXHAUSTED" in type(exc).__name__:
                 st.error("达到 Gemini 免费额度或频率限制（429）。请稍后再试，或减少字数；无需付费。")
