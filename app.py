@@ -1,8 +1,9 @@
-"""AI 小说创作助手：Streamlit + OpenAI Responses API。"""
+"""AI 小说创作助手：Streamlit + Google Gemini 免费额度 API。"""
 import os
 
 import streamlit as st
-from openai import OpenAI
+from google import genai
+from google.genai import types
 
 st.set_page_config(
     page_title="AI 小说创作助手",
@@ -14,9 +15,9 @@ st.set_page_config(
 # 请勿把 API Key 写进本文件或上传到 GitHub。
 def get_api_key():
     try:
-        return st.secrets.get("OPENAI_API_KEY", "") or os.getenv("OPENAI_API_KEY", "")
+        return st.secrets.get("GEMINI_API_KEY", "") or os.getenv("GEMINI_API_KEY", "")
     except Exception:
-        return os.getenv("OPENAI_API_KEY", "")
+        return os.getenv("GEMINI_API_KEY", "")
 
 
 PLATFORMS = {
@@ -45,6 +46,7 @@ SYSTEM_PROMPT = """你是资深中文网络小说作者与编辑。
 st.title("📖 AI 小说创作助手")
 st.caption("从想法到大纲、从开篇到续写｜适合知乎短篇、番茄男频等创作方向")
 st.info("建议先用“生成大纲”，再分章节创作。万字长篇需要分多次生成与人工检查衔接。")
+st.caption("目前接入 Google Gemini 免费额度：请求次数有限；请不要输入需要严格保密的未公开稿件。")
 
 with st.sidebar:
     st.header("⚙️ 创作设置")
@@ -56,6 +58,15 @@ with st.sidebar:
     ])
     length = st.select_slider("本次目标字数", options=[600, 1000, 1500, 2000, 2500], value=1500)
     st.caption("目标字数为写作参考，AI 每次输出可能有偏差。")
+    model_choice = st.selectbox(
+        "免费模型",
+        ["Gemini 2.5 Flash", "Gemini 2.5 Flash-Lite"],
+        help="两个模型均有免费额度，但免费请求量有限。"
+    )
+    model_name = {
+        "Gemini 2.5 Flash": "gemini-2.5-flash",
+        "Gemini 2.5 Flash-Lite": "gemini-2.5-flash-lite",
+    }[model_choice]
 
 left, right = st.columns(2)
 with left:
@@ -81,7 +92,7 @@ if "generated_text" not in st.session_state:
 if st.button("✨ 开始生成", type="primary", use_container_width=True):
     key = get_api_key()
     if not key:
-        st.error("尚未配置 OpenAI API Key。请前往 Streamlit Cloud → App settings → Secrets，添加 OPENAI_API_KEY。")
+        st.error("尚未配置 Gemini API Key。请前往 Streamlit Cloud → App settings → Secrets，添加 GEMINI_API_KEY。")
     elif task in ("续写章节", "润色已有正文") and not previous.strip():
         st.warning("续写或润色需要先在“已有正文”中粘贴原文。")
     elif not any([title.strip(), characters.strip(), ideas.strip(), previous.strip()]):
@@ -100,19 +111,28 @@ if st.button("✨ 开始生成", type="primary", use_container_width=True):
 若本次只创作一个章节，不要强行写完整部长篇。"""
         try:
             with st.spinner("正在构思和写作……"):
-                client = OpenAI(api_key=key, timeout=180.0)
-                result = client.responses.create(
-                    model="gpt-4.1-mini",
-                    instructions=SYSTEM_PROMPT,
-                    input=prompt,
-                    max_output_tokens=6500,
+                client = genai.Client(api_key=key)
+                result = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_PROMPT,
+                        temperature=0.85,
+                        max_output_tokens=6500,
+                    ),
                 )
-                st.session_state.generated_text = result.output_text or ""
+                st.session_state.generated_text = result.text or ""
             if not st.session_state.generated_text:
                 st.warning("模型未返回可显示的文字，请调整要求后重试。")
         except Exception as exc:
-            # 错误信息只显示类型，不暴露可能包含敏感配置的内部详情。
-            st.error(f"生成失败（{type(exc).__name__}）。请检查 API 额度、密钥权限或稍后重试。")
+            # 避免直接输出服务端异常详情，其中可能包含不该公开的信息。
+            code = getattr(exc, "code", None)
+            if code == 429 or "RESOURCE_EXHAUSTED" in type(exc).__name__:
+                st.error("达到 Gemini 免费额度或频率限制（429）。请稍后再试，或减少字数；无需付费。")
+            elif code in (401, 403):
+                st.error("Gemini 密钥认证失败或接口无权限。请检查 Streamlit Secrets 里的 GEMINI_API_KEY。")
+            else:
+                st.error(f"生成失败（{type(exc).__name__}）。请检查 Gemini 免费额度、项目权限或网络连接。")
 
 if st.session_state.generated_text:
     st.divider()
@@ -127,4 +147,4 @@ if st.session_state.generated_text:
     )
 
 st.divider()
-st.caption("注意：AI 内容仍需人工核对人设、情节衔接与原创性。API 调用按用量计费；不要分享密钥。")
+st.caption("注意：AI 内容仍需人工核对人设、情节衔接与原创性。Gemini 免费层级有用量上限，部分内容可能用于服务改进；不要分享密钥或公开私人稿件。")

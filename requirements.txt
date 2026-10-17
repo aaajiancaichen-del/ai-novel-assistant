@@ -1,2 +1,2 @@
 streamlit>=1.45
-openai>=1.80
+google-genai>=1.0.0
