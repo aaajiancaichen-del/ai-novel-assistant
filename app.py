@@ -60,12 +60,13 @@ with st.sidebar:
     st.caption("目标字数为写作参考，AI 每次输出可能有偏差。")
     model_choice = st.selectbox(
         "免费模型",
-        ["Gemini 2.5 Flash", "Gemini 2.5 Flash-Lite"],
-        help="两个模型均有免费额度，但免费请求量有限。"
+        ["Gemini 3.8 Flash", "Gemini 3.5 Flash-Lite"],
+        index=1,
+        help="两个模型均有免费额度，使用量有限。"
     )
     model_name = {
-        "Gemini 2.5 Flash": "gemini-2.5-flash",
-        "Gemini 2.5 Flash-Lite": "gemini-2.5-flash-lite",
+        "Gemini 3.8 Flash": "gemini-3.8-flash",
+        "Gemini 3.5 Flash-Lite": "gemini-3.5-flash-lite",
     }[model_choice]
 
 left, right = st.columns(2)
